@@ -1,0 +1,77 @@
+##This guide details how to extract the BMI associated SNPs (Locke et al., 2015) from the UK Biobank full release, create PRS and exclude individuals according to the MRC IEU exclusion criteria (DOI: 10.5523/bris.3074krb6t2frj29yh2b03x3wxj)
+#Robyn Wootton
+###########################################################
+#Contents
+#1. Extract SNPs
+#2. Create Exclusion List
+#3. Create Recoded genotypes
+#4. Creating profiles in PLINK
+###########################################################
+
+###########################################################
+#1. Extract SNPs
+###########################################################
+#The first .sh script to run is “Script1_extractBMISNPs.sh”
+#This is adapted from Hannah Sallis’ “extract_all_mr_paper_snps.sh”
+
+#Before running it, you must:
+	#1. Change DIR2 to your working directory on BC
+	#2. Create a list of BMI snps (1 per row) and put in the directory DIR2 as specified in “Script1_extractBMISNPs.sh”
+	#3. Edit the chromosome numbers in the loop so that they are only the chromosomes your SNPs are on (NOTE. chromosomes 1-9 must be written as 01, 02 etc.)
+#Then run the script and it will use qctool to extract SNPs of interest. Data is written to a .gen file which plink can read. 
+
+#commands
+cd /path/to/my/directory
+qsub Script1_BMISNPs.sh
+
+#This can take a couple of days to run with 100 SNPs
+
+###########################################################
+#2. Create Exclusion List
+###########################################################
+# Temporarily copy the exclusion lists to working directory and combine exclusion lists there (DOI: 10.5523/bris.3074krb6t2frj29yh2b03x3wxj) 
+
+cat data.combined_recommended.txt data.non_white_british.txt > biobank_exclusion_list.txt
+cat data.minimal_relateds.txt >> biobank_exclusion_list.txt
+cat data.highly_relateds.txt >> biobank_exclusion_list.txt
+
+wc -l  biobank_exclusion_list.txt
+
+
+# There are some duplicates once add in the ancestry stuff - this line prints out the entries with duplicate lines and counts them
+ sort biobank_exclusion_list.txt | uniq -cd | wc -l
+
+# There are 8671 ids which appear more than once in this list
+
+# To create a file with a single entry per individual
+sort biobank_exclusion_list.txt | uniq > biobank_exclusion_list_unique_ids.txt
+
+# Leaves 151,262 people in the unique exclusion list
+# These are the people who should be excluded from the genotype files - the  exclusions relating to the imputed files are 150 294
+
+# Remove the original biobank exclusion lists
+# Once I have done this once, all of the rest of the times I can just use the exclusion list I have created here
+
+###########################################################
+#3. Create Recoded genotypes
+###########################################################
+#The second .sh script to run is “Script2_create_recoded_genotypes_BMI.sh”
+#This is adapted from Hannah Sallis' “create_recoded_genotypes.sh”
+
+#Before running it, you must change DIR2 to your working directory on BC
+#It creates a .raw file with the appropriate individuals excluded 
+
+#commands
+qsub Script2_create_recoded_genotypes_BMI.sh
+
+
+###########################################################
+#4. Creating profiles in PLINK
+###########################################################
+#The third script creates the polygenic scores using PLINK and the betas from Locke et al. 2015
+
+qsub Script3_creating_profiles.sh
+
+#This should generate a .profile file which can be read into R
+#Check that the 151,262 exclusions have been removed and N = 337115
+
